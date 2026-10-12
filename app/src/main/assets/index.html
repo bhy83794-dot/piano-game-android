@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="theme-color" content="#38bdf8">
+  <link rel="manifest" href="manifest.json">
+  <title>🎹 灵动琴键 - 钢琴音乐节奏小游戏</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --accent: #38bdf8;
+      --accent-glow: rgba(56, 189, 248, 0.4);
+      --gold: #fbbf24;
+      --white-key: #ffffff;
+      --black-key: #1e293b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background: radial-gradient(circle at top, #1e293b 0%, #090d16 100%);
+      color: #f8fafc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      overflow-x: hidden;
+    }
+
+    /* 顶部导航与控制栏 */
+    header {
+      width: 100%;
+      max-width: 1000px;
+      padding: 20px 24px 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .title-box h1 {
+      font-size: 24px;
+      font-weight: 700;
+      background: linear-gradient(135deg, #38bdf8, #818cf8, #f472b6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .title-box p {
+      font-size: 13px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    .game-stats {
+      display: flex;
+      gap: 16px;
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      padding: 8px 18px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .stat-item span.label {
+      font-size: 11px;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-item span.val {
+      font-size: 18px;
+      font-weight: 800;
+      color: #38bdf8;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* 选歌与模式控制器 */
+    .controls {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    select, button {
+      background: rgba(30, 41, 59, 0.8);
+      color: #f1f5f9;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      outline: none;
+    }
+
+    select:hover, button:hover {
+      background: #334155;
+      border-color: #38bdf8;
+      transform: translateY(-1px);
+    }
+
+    button.primary {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      border: none;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4);
+    }
+
+    button.primary:hover {
+      box-shadow: 0 6px 20px rgba(37, 99, 235, 0.6);
+    }
+
+    /* 瀑布流游戏画布区域 */
+    .game-stage {
+      position: relative;
+      width: 100%;
+      max-width: 900px;
+      height: 280px;
+      background: rgba(15, 23, 42, 0.6);
+      border-radius: 16px 16px 0 0;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-bottom: none;
+      box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.5);
+    }
+
+    #track-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .judgment-overlay {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 32px;
+      font-weight: 900;
+      letter-spacing: 2px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s, transform 0.15s;
+      text-shadow: 0 0 20px currentColor;
+    }
+
+    .hit-perfect { color: #38bdf8; }
+    .hit-great { color: #4ade80; }
+    .hit-miss { color: #f43f5e; }
+
+    /* 钢琴键盘区域 */
+    .piano-container {
+      position: relative;
+      width: 100%;
+      max-width: 900px;
+      height: 200px;
+      background: #020617;
+      border-radius: 0 0 16px 16px;
+      padding: 0 4px 12px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), 0 0 30px rgba(56, 189, 248, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-top: 3px solid #38bdf8;
+      display: flex;
+    }
+
+    .keyboard {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      display: flex;
+    }
+
+    /* 白键 */
+    .white-key {
+      flex: 1;
+      height: 100%;
+      background: linear-gradient(to bottom, #f8fafc 0%, #e2e8f0 85%, #cbd5e1 100%);
+      border: 1px solid #94a3b8;
+      border-radius: 0 0 8px 8px;
+      position: relative;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      padding-bottom: 12px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2), inset 0 -4px 6px rgba(0,0,0,0.1);
+      transition: background 0.08s, transform 0.08s, box-shadow 0.08s;
+      z-index: 1;
+    }
+
+    .white-key:active, .white-key.active {
+      background: linear-gradient(to bottom, #bae6fd 0%, #38bdf8 100%);
+      transform: translateY(3px);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4), inset 0 2px 4px rgba(255,255,255,0.4);
+    }
+
+    .white-key span.note-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    .white-key span.key-binding {
+      font-size: 11px;
+      font-weight: 600;
+      color: #64748b;
+      background: rgba(0, 0, 0, 0.06);
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-top: 4px;
+    }
+
+    /* 黑键 */
+    .black-key {
+      position: absolute;
+      width: 4.8%;
+      height: 62%;
+      background: linear-gradient(180deg, #334155 0%, #0f172a 70%, #020617 100%);
+      border: 1px solid #000;
+      border-radius: 0 0 6px 6px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      align-items: center;
+      padding-bottom: 8px;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5), inset 0 1px 2px rgba(255,255,255,0.2);
+      z-index: 2;
+      transition: background 0.08s, transform 0.08s, box-shadow 0.08s;
+    }
+
+    .black-key:active, .black-key.active {
+      background: linear-gradient(180deg, #0369a1 0%, #0284c7 100%);
+      transform: translateY(2px);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+    }
+
+    .black-key span.note-name {
+      font-size: 10px;
+      font-weight: 600;
+      color: #cbd5e1;
+    }
+
+    .black-key span.key-binding {
+      font-size: 10px;
+      font-weight: 700;
+      color: #38bdf8;
+      background: rgba(255, 255, 255, 0.1);
+      padding: 1px 4px;
+      border-radius: 3px;
+      margin-top: 2px;
+    }
+
+    /* 底部提示 */
+    footer {
+      width: 100%;
+      max-width: 1000px;
+      padding: 16px 20px 24px;
+      text-align: center;
+      color: #64748b;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .keyboard-guide kbd {
+      background: #1e293b;
+      color: #38bdf8;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-family: inherit;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 头部控制与计分面板 -->
+  <header>
+    <div class="title-box">
+      <h1>🎹 灵动琴键 (Vibrant Piano)</h1>
+      <p>键盘按键或点击琴键演奏，挑战经典名曲！</p>
+    </div>
+
+    <div class="game-stats">
+      <div class="stat-item">
+        <span class="label">分数 (Score)</span>
+        <span class="val" id="score-display">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="label">连击 (Combo)</span>
+        <span class="val" id="combo-display">0</span>
+      </div>
+      <div class="stat-item">
+        <span class="label">最高 (Max)</span>
+        <span class="val" id="max-combo-display">0</span>
+      </div>
+    </div>
+
+    <div class="controls">
+      <select id="song-select">
+        <option value="twinkle">🌟 小星星 (Twinkle)</option>
+        <option value="elise">🎼 致爱丽丝 (Für Elise)</option>
+        <option value="canon">🎻 卡农旋律 (Canon in D)</option>
+        <option value="free">🎹 自由弹奏模式 (Free Play)</option>
+      </select>
+      <button class="primary" id="btn-play">▶ 播放曲目</button>
+      <button id="btn-reset">↺ 重新开始</button>
+    </div>
+  </header>
+
+  <!-- 瀑布流游戏画布 -->
+  <div class="game-stage">
+    <canvas id="track-canvas"></canvas>
+    <div class="judgment-overlay" id="judgment">PERFECT</div>
+  </div>
+
+  <!-- 钢琴物理键盘 -->
+  <div class="piano-container">
+    <div class="keyboard" id="keyboard">
+      <!-- 白键由 JS 自动生成，黑键绝对定位叠加 -->
+    </div>
+  </div>
+
+  <!-- 底部按键提示 -->
+  <footer>
+    <div class="keyboard-guide">
+      💡 <b>电脑按键对应</b>：白键 <kbd>A</kbd> <kbd>S</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>G</kbd> <kbd>H</kbd> <kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> <kbd>;</kbd> <kbd>'</kbd> ｜ 黑键 <kbd>W</kbd> <kbd>E</kbd> <kbd>T</kbd> <kbd>Y</kbd> <kbd>U</kbd> <kbd>O</kbd> <kbd>P</kbd>
+    </div>
+  </footer>
+
+  <script>
+    // --- 1. 高品质 Web Audio API 物理钢琴合成引擎 ---
+    let audioCtx = null;
+
+    function getAudioContext() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      return audioCtx;
+    }
+
+    // 钢琴琴键定义（音名、频率、键盘绑定、是否黑键）
+    const PIANO_KEYS = [
+      { note: 'C4',  freq: 261.63, isBlack: false, key: 'A',  label: 'C4' },
+      { note: 'C#4', freq: 277.18, isBlack: true,  key: 'W',  label: 'C#' },
+      { note: 'D4',  freq: 293.66, isBlack: false, key: 'S',  label: 'D4' },
+      { note: 'D#4', freq: 311.13, isBlack: true,  key: 'E',  label: 'D#' },
+      { note: 'E4',  freq: 329.63, isBlack: false, key: 'D',  label: 'E4' },
+      { note: 'F4',  freq: 349.23, isBlack: false, key: 'F',  label: 'F4' },
+      { note: 'F#4', freq: 369.99, isBlack: true,  key: 'T',  label: 'F#' },
+      { note: 'G4',  freq: 392.00, isBlack: false, key: 'G',  label: 'G4' },
+      { note: 'G#4', freq: 415.30, isBlack: true,  key: 'Y',  label: 'G#' },
+      { note: 'A4',  freq: 440.00, isBlack: false, key: 'H',  label: 'A4' },
+      { note: 'A#4', freq: 466.16, isBlack: true,  key: 'U',  label: 'A#' },
+      { note: 'B4',  freq: 493.88, isBlack: false, key: 'J',  label: 'B4' },
+      { note: 'C5',  freq: 523.25, isBlack: false, key: 'K',  label: 'C5' },
+      { note: 'C#5', freq: 554.37, isBlack: true,  key: 'O',  label: 'C#' },
+      { note: 'D5',  freq: 587.33, isBlack: false, key: 'L',  label: 'D5' },
+      { note: 'D#5', freq: 622.25, isBlack: true,  key: 'P',  label: 'D#' },
+      { note: 'E5',  freq: 659.25, isBlack: false, key: ';',  label: 'E5' },
+      { note: 'F5',  freq: 698.46, isBlack: false, key: "'",  label: 'F5' },
+    ];
+
+    // 钢琴音色合成器（多重谐波 + ADSR 指数衰减模拟琴弦金属震动与混响）
+    function playPianoTone(freq) {
+      const ctx = getAudioContext();
+      const now = ctx.currentTime;
+
+      // 泛音配置：基波 + 2倍频 + 3倍频 + 4倍频
+      const harmonics = [
+        { mult: 1, gain: 0.6 },
+        { mult: 2, gain: 0.25 },
+        { mult: 3, gain: 0.1 },
+        { mult: 4, gain: 0.05 }
+      ];
+
+      const masterGain = ctx.createGain();
+      masterGain.gain.setValueAtTime(0.7, now);
+      // ADSR 包络：快速打击(Attack) + 延音衰减(Decay) + 释放(Release)
+      masterGain.gain.exponentialRampToValueAtTime(0.0001, now + 2.2);
+
+      // 低通滤波器模拟琴弦击锤柔软度
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.setValueAtTime(freq * 6, now);
+      filter.frequency.exponentialRampToValueAtTime(freq * 1.5, now + 1.8);
+
+      harmonics.forEach(h => {
+        const osc = ctx.createOscillator();
+        const oscGain = ctx.createGain();
+
+        osc.type = (h.mult === 1) ? 'triangle' : 'sine';
+        osc.frequency.setValueAtTime(freq * h.mult, now);
+
+        oscGain.gain.setValueAtTime(h.gain, now);
+        oscGain.gain.exponentialRampToValueAtTime(0.0001, now + 2.0);
+
+        osc.connect(oscGain);
+        oscGain.connect(filter);
+
+        osc.start(now);
+        osc.stop(now + 2.3);
+      });
+
+      filter.connect(masterGain);
+      masterGain.connect(ctx.destination);
+    }
+
+    // --- 2. 渲染 UI 键盘与按键映射 ---
+    const keyboardEl = document.getElementById('keyboard');
+    const keyElements = new Map();
+
+    // 统计白键总数，用于计算黑键的相对位置
+    const whiteKeys = PIANO_KEYS.filter(k => !k.isBlack);
+    let whiteIndex = 0;
+
+    PIANO_KEYS.forEach((k) => {
+      const el = document.createElement('div');
+      if (k.isBlack) {
+        el.className = 'black-key';
+        // 计算黑键水平相对位置（依附在相邻白键中间）
+        const leftPercent = (whiteIndex / whiteKeys.length) * 100 - 2.4;
+        el.style.left = `${leftPercent}%`;
+      } else {
+        el.className = 'white-key';
+        whiteIndex++;
+      }
+
+      el.innerHTML = `
+        <span class="note-name">${k.label}</span>
+        <span class="key-binding">${k.key}</span>
+      `;
+
+      // 交互事件
+      const trigger = () => triggerNote(k.note, true);
+      el.addEventListener('mousedown', trigger);
+      el.addEventListener('touchstart', (e) => { e.preventDefault(); trigger(); });
+
+      keyboardEl.appendChild(el);
+      keyElements.set(k.note, el);
+    });
+
+    // 键盘映射
+    const keyMap = new Map();
+    PIANO_KEYS.forEach(k => {
+      keyMap.set(k.key.toUpperCase(), k.note);
+      if (k.key === ';') keyMap.set(';', k.note);
+      if (k.key === "'") keyMap.set("'", k.note);
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if (e.repeat) return;
+      const keyUpper = e.key.toUpperCase();
+      let note = keyMap.get(keyUpper) || keyMap.get(e.key);
+      if (note) {
+        triggerNote(note, true);
+      }
+    });
+
+    // 触发琴键响音与高亮动画
+    function triggerNote(noteName, isUserPlay = false) {
+      const noteData = PIANO_KEYS.find(k => k.note === noteName);
+      if (!noteData) return;
+
+      playPianoTone(noteData.freq);
+
+      const el = keyElements.get(noteName);
+      if (el) {
+        el.classList.add('active');
+        setTimeout(() => el.classList.remove('active'), 180);
+      }
+
+      // 如果是在游玩模式下，判定是否命中掉落音符
+      if (isUserPlay) {
+        checkHit(noteName);
+      }
+    }
+
+    // --- 3. 经典乐谱库 ---
+    const SONGS = {
+      twinkle: [
+        { note: 'C4', time: 1.0 }, { note: 'C4', time: 1.5 }, { note: 'G4', time: 2.0 }, { note: 'G4', time: 2.5 },
+        { note: 'A4', time: 3.0 }, { note: 'A4', time: 3.5 }, { note: 'G4', time: 4.0 },
+        { note: 'F4', time: 5.0 }, { note: 'F4', time: 5.5 }, { note: 'E4', time: 6.0 }, { note: 'E4', time: 6.5 },
+        { note: 'D4', time: 7.0 }, { note: 'D4', time: 7.5 }, { note: 'C4', time: 8.0 },
+        { note: 'G4', time: 9.0 }, { note: 'G4', time: 9.5 }, { note: 'F4', time: 10.0 }, { note: 'F4', time: 10.5 },
+        { note: 'E4', time: 11.0 }, { note: 'E4', time: 11.5 }, { note: 'D4', time: 12.0 },
+        { note: 'G4', time: 13.0 }, { note: 'G4', time: 13.5 }, { note: 'F4', time: 14.0 }, { note: 'F4', time: 14.5 },
+        { note: 'E4', time: 15.0 }, { note: 'E4', time: 15.5 }, { note: 'D4', time: 16.0 },
+      ],
+      elise: [
+        { note: 'E5', time: 1.0 }, { note: 'D#5', time: 1.3 }, { note: 'E5', time: 1.6 }, { note: 'D#5', time: 1.9 },
+        { note: 'E5', time: 2.2 }, { note: 'B4', time: 2.5 }, { note: 'D5', time: 2.8 }, { note: 'C5', time: 3.1 },
+        { note: 'A4', time: 3.6 },
+        { note: 'C4', time: 4.4 }, { note: 'E4', time: 4.7 }, { note: 'A4', time: 5.0 }, { note: 'B4', time: 5.5 },
+        { note: 'E4', time: 6.2 }, { note: 'G#4', time: 6.5 }, { note: 'B4', time: 6.8 }, { note: 'C5', time: 7.3 },
+      ],
+      canon: [
+        { note: 'F#4', time: 1.0 }, { note: 'E4', time: 2.0 }, { note: 'D4', time: 3.0 }, { note: 'C#4', time: 4.0 },
+        { note: 'B4', time: 5.0 }, { note: 'A4', time: 6.0 }, { note: 'B4', time: 7.0 }, { note: 'C#4', time: 8.0 },
+        { note: 'D4', time: 9.0 }, { note: 'F#4', time: 9.5 }, { note: 'A4', time: 10.0 }, { note: 'F#4', time: 10.5 },
+        { note: 'E4', time: 11.0 }, { note: 'G4', time: 11.5 }, { note: 'B4', time: 12.0 }, { note: 'C#5', time: 12.5 },
+      ],
+      free: []
+    };
+
+    // --- 4. 瀑布流音符游戏引擎与判定系统 ---
+    const canvas = document.getElementById('track-canvas');
+    const ctx2d = canvas.getContext('2d');
+    const judgmentEl = document.getElementById('judgment');
+    const scoreVal = document.getElementById('score-display');
+    const comboVal = document.getElementById('combo-display');
+    const maxComboVal = document.getElementById('max-combo-display');
+
+    let currentSong = [];
+    let isPlaying = false;
+    let songStartTime = 0;
+    let score = 0;
+    let combo = 0;
+    let maxCombo = 0;
+    const FALL_DURATION = 2.4; // 音符从顶部下落到判定线耗时(秒)
+
+    function resizeCanvas() {
+      canvas.width = canvas.parentElement.clientWidth;
+      canvas.height = canvas.parentElement.clientHeight;
+    }
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+
+    function getNoteX(noteName) {
+      const el = keyElements.get(noteName);
+      if (!el) return canvas.width / 2;
+      const rect = el.getBoundingClientRect();
+      const parentRect = keyboardEl.getBoundingClientRect();
+      const x = rect.left - parentRect.left + rect.width / 2;
+      return (x / parentRect.width) * canvas.width;
+    }
+
+    function checkHit(noteName) {
+      if (!isPlaying || !currentSong.length) return;
+      const elapsed = (performance.now() - songStartTime) / 1000;
+
+      // 寻找当前时间窗口中最接近判定线的音符
+      const candidate = currentSong.find(n => n.note === noteName && !n.hit && !n.miss);
+      if (!candidate) return;
+
+      const diff = Math.abs(candidate.time - elapsed);
+      if (diff <= 0.18) {
+        candidate.hit = true;
+        if (diff <= 0.08) {
+          showJudgment('PERFECT', 'hit-perfect');
+          addScore(100);
+        } else {
+          showJudgment('GREAT', 'hit-great');
+          addScore(60);
+        }
+      }
+    }
+
+    function addScore(points) {
+      combo++;
+      if (combo > maxCombo) maxCombo = combo;
+      score += points + (combo * 5);
+
+      scoreVal.textContent = score;
+      comboVal.textContent = combo;
+      maxComboVal.textContent = maxCombo;
+    }
+
+    function showJudgment(text, className) {
+      judgmentEl.textContent = text;
+      judgmentEl.className = 'judgment-overlay ' + className;
+      judgmentEl.style.opacity = '1';
+      judgmentEl.style.transform = 'translate(-50%, -50%) scale(1.15)';
+      setTimeout(() => {
+        judgmentEl.style.opacity = '0';
+        judgmentEl.style.transform = 'translate(-50%, -50%) scale(0.9)';
+      }, 350);
+    }
+
+    // 主渲染循环
+    function gameLoop(now) {
+      ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 绘制底部判定基准线
+      const targetY = canvas.height - 18;
+      ctx2d.strokeStyle = 'rgba(56, 189, 248, 0.4)';
+      ctx2d.lineWidth = 3;
+      ctx2d.beginPath();
+      ctx2d.moveTo(0, targetY);
+      ctx2d.lineTo(canvas.width, targetY);
+      ctx2d.stroke();
+
+      if (isPlaying) {
+        const elapsed = (now - songStartTime) / 1000;
+        let finished = true;
+
+        currentSong.forEach(item => {
+          const timeUntilHit = item.time - elapsed;
+
+          // 自动判断未击中 (Miss)
+          if (timeUntilHit < -0.22 && !item.hit && !item.miss) {
+            item.miss = true;
+            combo = 0;
+            comboVal.textContent = 0;
+            showJudgment('MISS', 'hit-miss');
+          }
+
+          if (!item.hit) {
+            finished = false;
+            // 计算音符 Y 坐标
+            const progress = 1 - (timeUntilHit / FALL_DURATION);
+            if (progress >= 0 && progress <= 1.1) {
+              const y = progress * targetY;
+              const x = getNoteX(item.note);
+
+              // 绘制流光音符方块
+              const isBlack = item.note.includes('#');
+              ctx2d.fillStyle = isBlack ? '#38bdf8' : '#818cf8';
+              ctx2d.shadowColor = isBlack ? '#38bdf8' : '#818cf8';
+              ctx2d.shadowBlur = 12;
+
+              ctx2d.beginPath();
+              ctx2d.roundRect(x - 18, y - 8, 36, 16, 6);
+              ctx2d.fill();
+
+              ctx2d.shadowBlur = 0; // 重置光晕
+            }
+          }
+        });
+
+        // 完曲结算
+        if (finished && currentSong.length > 0 && elapsed > currentSong[currentSong.length - 1].time + 1.0) {
+          isPlaying = false;
+          showJudgment('CLEAR!', 'hit-perfect');
+          document.getElementById('btn-play').textContent = '▶ 播放曲目';
+        }
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+    requestAnimationFrame(gameLoop);
+
+    // --- 5. 控制按钮绑定 ---
+    const playBtn = document.getElementById('btn-play');
+    const songSelect = document.getElementById('song-select');
+
+    playBtn.addEventListener('click', () => {
+      getAudioContext();
+      const songKey = songSelect.value;
+      if (songKey === 'free') {
+        alert('自由弹奏模式：请直接使用电脑键盘或鼠标弹奏钢琴！');
+        return;
+      }
+
+      // 重置谱面状态
+      currentSong = SONGS[songKey].map(n => ({ ...n, hit: false, miss: false }));
+      score = 0;
+      combo = 0;
+      scoreVal.textContent = 0;
+      comboVal.textContent = 0;
+      isPlaying = true;
+      songStartTime = performance.now();
+      playBtn.textContent = '⏹ 重新播放';
+    });
+
+    document.getElementById('btn-reset').addEventListener('click', () => {
+      score = 0;
+      combo = 0;
+      maxCombo = 0;
+      isPlaying = false;
+      scoreVal.textContent = 0;
+      comboVal.textContent = 0;
+      maxComboVal.textContent = 0;
+      currentSong = [];
+      playBtn.textContent = '▶ 播放曲目';
+    });
+  </script>
+</body>
+</html>
